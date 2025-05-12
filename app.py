@@ -12,58 +12,43 @@ def query_db(query, args=(), one=False):
         cur.execute(query, args)
         rv = cur.fetchall()
     except sqlite3.Error as e:
-        print(f"SQL Error: {e}")  # Debug: Ver error SQL
+        print(f"SQL Error: {e}")
         rv = []
     finally:
         con.close()
     return (rv[0] if rv else None) if one else rv
 
-@app.route('/cancelaciones/causal', methods=['GET'])
-def get_cancelaciones_by_causal():
+@app.route('/cancelaciones/contar', methods=['GET'])
+def contar_cancelaciones_por_causal():
     causal = request.args.get('causal')
     if not causal or not causal.strip():
         return jsonify({'error': 'El parámetro causal no puede estar vacío'}), 400
 
-    # Consulta para obtener todos los registros del causal sin duplicados
+    # Consulta para contar y listar clientes por causal
     query = '''
-        SELECT DISTINCT causal, bodega, fecha_cancel, doc, razon_social, ref, descripcion, cant, valor
+        SELECT COUNT(*) as total, razon_social
         FROM cancelaciones
         WHERE LOWER(causal) LIKE ?
+        GROUP BY razon_social
     '''
     search_param = f"%{causal.lower()}%"
-
-    # Debug: Verificar los parámetros enviados
-    print(f"Ejecutando consulta SQL: {query} con parámetros: {search_param}")
 
     try:
         results = query_db(query, (search_param,))
     except sqlite3.Error as e:
-        return jsonify({'error': f'Error al acceder a la base de datos: {str(e)}'}), 500
+        return jsonify({'error': f'Error al acceder a la base de datos: {str(e)}')}), 500
 
     if not results:
         return jsonify({'message': 'No se encontraron registros para el causal especificado.'}), 404
 
     # Estructura del JSON de respuesta
-    cancelaciones = []
-    for row in results:
-        cancelacion = {
-            'causal': row[0],
-            'bodega': row[1],
-            'fecha_cancel': row[2],
-            'doc': row[3],
-            'razon_social': row[4],
-            'ref': row[5],
-            'descripcion': row[6],
-            'cantidad': row[7],
-            'valor': row[8]
-        }
-        if cancelacion not in cancelaciones:
-            cancelaciones.append(cancelacion)
+    clientes = [
+        {'razon_social': row[1], 'total_cancelaciones': row[0]} for row in results
+    ]
 
-    # Generar lista de causales únicos para sugerencias
-    causales_unicos = list(set([c['causal'] for c in cancelaciones]))
+    total_causales = sum(row[0] for row in results)
 
-    return jsonify({'causales_sugeridos': causales_unicos, 'cancelaciones': cancelaciones})
+    return jsonify({'total_causales': total_causales, 'clientes': clientes})
 
 # Ejecutar localmente
 if __name__ == '__main__':
