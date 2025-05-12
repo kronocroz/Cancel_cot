@@ -1,65 +1,63 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 import sqlite3
-import pandas as pd
-import os
 
 app = Flask(__name__)
+DB_PATH = 'cancel.db'
 
-# Endpoint raíz para verificar que la API está activa
-@app.route('/')
-def home():
-    return "✅ API de cancelaciones está activa."
+def query_db(query, args=(), one=False):
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute(query, args)
+    rv = cur.fetchall()
+    con.close()
+    return (rv[0] if rv else None) if one else rv
 
-# Endpoint para consultar todas las cancelaciones
-@app.route('/cancelaciones', methods=['GET'])
-def obtener_cancelaciones():
+@app.route('/cancelaciones/causal', methods=['GET'])
+def get_cancelaciones_by_causal():
+    causal = request.args.get('causal')
+    if not causal or not causal.strip():
+        return jsonify({'error': 'El parámetro causal no puede estar vacío'}), 400
+
+    # Consulta para obtener todos los registros del causal sin duplicados
+    query = '''
+        SELECT DISTINCT causal, bodega, fecha_cancel, doc, razon_social, ref, descripcion, cant, valor
+        FROM cancelaciones
+        WHERE causal LIKE ?
+    '''
+    search_param = f"%{causal}%"
     try:
-        conn = sqlite3.connect("cancel.db")
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        results = query_db(query, (search_param,))
+    except sqlite3.Error as e:
+        return jsonify({'error': f'Error al acceder a la base de datos: {str(e)}'}), 500
 
-        cursor.execute("SELECT * FROM cancelaciones LIMIT 100")
-        filas = cursor.fetchall()
-        conn.close()
+    if not results:
+        return jsonify({'message': 'No se encontraron registros para el causal especificado.'}), 404
 
-        # Convertir resultado a lista de diccionarios
-        resultados = [dict(fila) for fila in filas]
+    # Estructura del JSON de respuesta
+    cancelaciones = []
+    for row in results:
+        cancelacion = {
+            'causal': row[0],
+            'bodega': row[1],
+            'fecha_cancel': row[2],
+            'doc': row[3],
+            'razon_social': row[4],
+            'ref': row[5],
+            'descripcion': row[6],
+            'cantidad': row[7],
+            'valor': row[8]
+        }
+        if cancelacion not in cancelaciones:
+            cancelaciones.append(cancelacion)
 
-        return jsonify(resultados)
+    # Generar lista de causales únicos para sugerencias
+    causales_unicos = list(set([c['causal'] for c in cancelaciones]))
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({'causales_sugeridos': causales_unicos, 'cancelaciones': cancelaciones})
 
-@app.route("/analisis_causal", methods=["GET"])
-def analisis_causal():
-    try:
-        conn = sqlite3.connect("cancel.db")
-        cursor = conn.cursor()
-
-        query = """
-            SELECT causal, COUNT(*) AS total_cancelaciones, SUM(valor) AS valor_total
-            FROM cancelaciones
-            GROUP BY causal
-            ORDER BY valor_total DESC
-        """
-        cursor.execute(query)
-        resultados = cursor.fetchall()
-        conn.close()
-
-        # Formato de respuesta
-        response = [
-            {
-                "causal": row[0],
-                "total_cancelaciones": row[1],
-                "valor_total": row[2]
-            }
-            for row in resultados
-        ]
-
-        return jsonify(response)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# Ejecutar localmente
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000)
 
 # Ejecutar localmente
 if __name__ == '__main__':
