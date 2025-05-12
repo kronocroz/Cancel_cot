@@ -2,10 +2,19 @@ from flask import Flask, request, jsonify
 import sqlite3
 
 app = Flask(__name__)
-DB_PATH = 'cancel.db'
+import requests
+
+DB_URL = 'https://cancel-cot.onrender.com'
 
 
-def query_db(query, args=(), one=False):
+def query_db(query, params={}):
+    try:
+        response = requests.get(DB_URL + query, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"HTTP Request Error: {e}")
+        return []
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
     try:
@@ -34,9 +43,9 @@ def contar_cancelaciones_por_causal():
     search_param = f"%{causal.lower()}%"
 
     try:
-        results = query_db(query, (search_param,))
+        results = query_db('/cancelaciones', params={'causal': search_param})
     except sqlite3.Error as e:
-        return jsonify({'error': f'Error al acceder a la base de datos: {str(e)}')}), 500
+        return jsonify({'error': f'Error al acceder a la base de datos: {str(e)}'}), 500
 
     if not results:
         return jsonify({'message': 'No se encontraron registros para el causal especificado.'}), 404
@@ -49,6 +58,10 @@ def contar_cancelaciones_por_causal():
     total_causales = sum(row[0] for row in results)
 
     return jsonify({'total_causales': total_causales, 'clientes': clientes})
+
+@app.route('/status', methods=['GET'])
+def check_status():
+    return jsonify({'message': 'API de cancelaciones activa'}), 200
 
 # Ejecutar localmente
 if __name__ == '__main__':
