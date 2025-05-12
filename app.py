@@ -4,12 +4,18 @@ import sqlite3
 app = Flask(__name__)
 DB_PATH = 'cancel.db'
 
+
 def query_db(query, args=(), one=False):
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
-    cur.execute(query, args)
-    rv = cur.fetchall()
-    con.close()
+    try:
+        cur.execute(query, args)
+        rv = cur.fetchall()
+    except sqlite3.Error as e:
+        print(f"SQL Error: {e}")  # Debug: Ver error SQL
+        rv = []
+    finally:
+        con.close()
     return (rv[0] if rv else None) if one else rv
 
 @app.route('/cancelaciones/causal', methods=['GET'])
@@ -22,9 +28,13 @@ def get_cancelaciones_by_causal():
     query = '''
         SELECT DISTINCT causal, bodega, fecha_cancel, doc, razon_social, ref, descripcion, cant, valor
         FROM cancelaciones
-        WHERE causal LIKE ?
+        WHERE LOWER(causal) LIKE ?
     '''
-    search_param = f"%{causal}%"
+    search_param = f"%{causal.lower()}%"
+
+    # Debug: Verificar los parámetros enviados
+    print(f"Ejecutando consulta SQL: {query} con parámetros: {search_param}")
+
     try:
         results = query_db(query, (search_param,))
     except sqlite3.Error as e:
