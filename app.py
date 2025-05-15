@@ -63,8 +63,4 @@ def contar_cancelaciones_por_causal():
 def check_status():
     return jsonify({'message': 'API de cancelaciones activa'}), 200
 
-# Ejecutar localmente
-if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+# No es necesario ejecutar app.run() porque Render usará gunicorn para iniciar la aplicación.
