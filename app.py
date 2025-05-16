@@ -23,10 +23,11 @@ def obtener_cancelaciones_test():
     try:
         conn = connect_db()
         cursor = conn.cursor()
+
         query = """
             SELECT 
                 bodega, 
-                fecha_cancel, 
+                fecha_can AS fecha_cancel, 
                 causal, 
                 doc, 
                 razon_social, 
