@@ -24,7 +24,17 @@ def obtener_cancelaciones_test():
         conn = connect_db()
         cursor = conn.cursor()
         query = """
-            SELECT bodega, fecha_cancel, doc, razon_social, ref, descripcion, cant, valor, causal 
+            SELECT 
+                bodega, 
+                fecha_cancel, 
+                causal, 
+                doc, 
+                razon_social, 
+                dpto, 
+                ref, 
+                descripcion, 
+                cant, 
+                valor 
             FROM cancelaciones 
             LIMIT 5
         """
@@ -32,6 +42,7 @@ def obtener_cancelaciones_test():
         rows = cursor.fetchall()
         conn.close()
 
+        # Si no hay resultados
         if not rows:
             return jsonify({"mensaje": "No se encontraron cancelaciones"}), 404
 
