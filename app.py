@@ -17,22 +17,26 @@ def connect_db():
 def home():
     return "✅ API de Cancelaciones está activa."
 
-@app.route("/cancelaciones", methods=["GET"])
-def obtener_cancelaciones():
-    """ Obtener todas las cancelaciones """
+@app.route("/cancelaciones/test", methods=["GET"])
+def obtener_cancelaciones_test():
+    """ Obtener los primeros 5 registros de cancelaciones """
     try:
         conn = connect_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM cancelaciones")
-        cancelaciones = cursor.fetchall()
+        query = """
+            SELECT bodega, fecha_cancel, doc, razon_social, ref, descripcion, cant, valor, causal 
+            FROM cancelaciones 
+            LIMIT 5
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
         conn.close()
 
-        # Convertir a lista de diccionarios
-        resultado = [dict(row) for row in cancelaciones]
-
-        if not resultado:
+        if not rows:
             return jsonify({"mensaje": "No se encontraron cancelaciones"}), 404
 
+        # Convertir a lista de diccionarios
+        resultado = [dict(row) for row in rows]
         return jsonify(resultado)
 
     except Exception as e:
